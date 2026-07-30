@@ -1,0 +1,181 @@
+config:
+  target: "http://localhost:5000"
+  phases:
+    - duration: 10
+      arrivalRate: 5
+      name: "Warm up phase"
+    - duration: 20
+      arrivalRate: 5
+      rampTo: 20
+      name: "Ramp up load"
+    - duration: 30
+      arrivalRate: 20
+      name: "Sustained load"
+  environments:
+    dev:
+      target: "http://localhost:5000"
+    prod:
+      target: "https://your-production-url.com"
+
+scenarios:
+  - name: "Browse public APIs (Categories & Lessons)"
+    weight: 7
+    flow:
+      - get:
+          url: "/api/categories"
+          expect:
+            - statusCode: 200
+      - think: 1
+      - get:
+          url: "/api/lessons"
+          expect:
+            - statusCode: 200
+
+  - name: "Unsuccessful Login Attempt"
+    weight: 3
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "invalid@example.com"
+            password: "wrongpassword"
+          expect:
+            - statusCode: 401
+
+  - name: "Browse Published Quizzes"
+    weight: 6
+    flow:
+      - get:
+          url: "/api/quiz/quizzes?isPublished=true"
+          expect:
+            - statusCode: 200
+      - think: 1
+      - get:
+          url: "/api/quiz/quizzes/{{ $randomString() }}"
+          expect:
+            - statusCode: [200, 404]
+
+  - name: "Generate Quiz Distractors (Third-Party API)"
+    weight: 2
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "contributor@test.com"
+            password: "test123"
+          capture:
+            - json: "$.content.token"
+              as: "authToken"
+      - think: 1
+      - post:
+          url: "/api/quiz/distractors/generate"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            correctAnswer: "happy"
+            count: 3
+          expect:
+            - statusCode: [200, 401]
+      - think: 2
+      - post:
+          url: "/api/quiz/distractors/hints"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            correctAnswer: "beautiful"
+            maxHints: 3
+          expect:
+            - statusCode: [200, 401]
+
+  - name: "View Quiz Statistics"
+    weight: 2
+    flow:
+      - get:
+          url: "/api/quiz/quizzes"
+          capture:
+            - json: "$.content[0]._id"
+              as: "quizId"
+      - think: 1
+      - get:
+          url: "/api/quiz/attempts/statistics/{{ quizId }}"
+          expect:
+            - statusCode: [200, 404]
+
+  - name: "Browse Published Courses"
+    weight: 8
+    flow:
+      - get:
+          url: "/api/course/courses?isPublished=true"
+          expect:
+            - statusCode: [200, 401]
+      - think: 1
+      - get:
+          url: "/api/course/courses"
+          expect:
+            - statusCode: [200, 401]
+
+  - name: "Course Enrollment Flow"
+    weight: 4
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "refugee@test.com"
+            password: "test123"
+          capture:
+            - json: "$.content.token"
+              as: "authToken"
+      - think: 1
+      - get:
+          url: "/api/course/courses?isPublished=true"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          capture:
+            - json: "$.content.courses[0]._id"
+              as: "courseId"
+      - think: 2
+      - post:
+          url: "/api/course/enrollments"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            courseId: "{{ courseId }}"
+          expect:
+            - statusCode: [201, 400, 401]
+      - think: 1
+      - get:
+          url: "/api/course/enrollments"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: [200, 401]
+
+  - name: "Update Course Progress"
+    weight: 3
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "refugee@test.com"
+            password: "test123"
+          capture:
+            - json: "$.content.token"
+              as: "authToken"
+      - think: 1
+      - get:
+          url: "/api/course/enrollments"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          capture:
+            - json: "$.content[0].courseId._id"
+              as: "courseId"
+      - think: 2
+      - patch:
+          url: "/api/course/enrollments/{{ courseId }}/progress"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            progress: 50
+          expect:
+            - statusCode: [200, 404, 401]
+
