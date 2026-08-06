@@ -1,6 +1,6 @@
 import express from "express";
 import * as authController from "../controller/authController.js";
-import { authenticate } from "../middleware/authMiddleware.js";
+import { authenticate , authorizeAdmin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -15,7 +15,9 @@ router.post(
 );
 
 router.post(
-    "/admin/signup", 
+    "/admin/signup",
+    authenticate,
+    authorizeAdmin,
     authController.signupAdmin
 );
 

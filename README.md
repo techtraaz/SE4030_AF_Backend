@@ -52,7 +52,7 @@ The objective of this assignment is to improve the security of an existing AF Ba
 
 | No. | Vulnerability | Status |
 |:---:|---------------|:------:|
-| 1 | Vulnerability | Pending |
+| 1 | Broken Access Control | Fixed |
 | 2 | Vulnerability | Pending |
 | 3 | Vulnerability | Pending |
 | 4 | Vulnerability | Pending |
