@@ -23,7 +23,9 @@ const createProfile = async (userId, role, data) => {
         throw new Error("Profile already exists");
     }
 
-    const profile = await ProfileModel.create({ userId, ...data });
+    const allowedFields = ALLOWED_UPDATE_FIELDS[role];
+    const sanitizedData = pickAllowedFields(data, allowedFields);
+    const profile = await ProfileModel.create({ userId, ...sanitizedData });
     return profile;
 };
 
