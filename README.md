@@ -54,8 +54,8 @@ The objective of this assignment is to improve the security of an existing AF Ba
 |:---:|---------------|:------:|
 | 1 | Broken Access Control | Fixed |
 | 2 | Unrestricted Cors Configuration | Fixed |
-| 3 | Vulnerability | Pending |
-| 4 | Vulnerability | Pending |
+| 3 | Over-Posting Vulnerability | Fixed |
+| 4 | Broken Authorization | Fixed |
 | 5 | Vulnerability | Pending |
 | 6 | Vulnerability | Pending |
 | 7 | Vulnerability | Pending |
