@@ -56,7 +56,10 @@ if (process.env.NODE_ENV !== "test") {
   app.use("/api/", generalLimiter);
 }
 
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+// Only expose API docs outside of production
+if (process.env.NODE_ENV !== "production") {
+  app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+}
 
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
