@@ -23,7 +23,9 @@ const createProfile = async (userId, role, data) => {
         throw new Error("Profile already exists");
     }
 
-    const profile = await ProfileModel.create({ userId, ...data });
+    const allowedFields = ALLOWED_UPDATE_FIELDS[role];
+    const sanitizedData = pickAllowedFields(data, allowedFields);
+    const profile = await ProfileModel.create({ userId, ...sanitizedData });
     return profile;
 };
 
@@ -47,12 +49,37 @@ const getProfile = async (userId, role) => {
 };
 
 //Update Profile
+// Replace the existing updateProfile function with more secure and role-aware implementation
+const ALLOWED_UPDATE_FIELDS = {
+    [ROLES.REFUGEE]: ['fullName', 'originCountry', 'preferredLanguage', 'educationLevel', 'dateOfBirth'],
+    [ROLES.CONTENT_CONTRIBUTOR]: ['organisationName', 'organisationType', 'contactPerson', 'phoneNumber', 'country'],
+    [ROLES.ADMIN]: ['fullName']
+};
+
+// Helper function to filter data based on allowed fields for the role
+const pickAllowedFields = (data, allowedFields) => {
+    const filteredData = {};
+    for (const key of allowedFields) {
+        if (data[key] !== undefined) {
+            filteredData[key] = data[key];
+        }
+    }
+    return filteredData;
+};
+
 const updateProfile = async (userId, role, data) => {
     const ProfileModel = getProfileModel(role);
 
+    const allowedFields = ALLOWED_UPDATE_FIELDS[role];
+    if (!allowedFields) {
+        throw new Error("No allowed fields for this role");
+    }
+
+    const sanitizedData = pickAllowedFields(data, allowedFields);
+
     const profile = await ProfileModel.findOneAndUpdate(
         { userId },
-        { $set: data },
+        { $set: sanitizedData },
         { new: true, runValidators: true }
     );
 
