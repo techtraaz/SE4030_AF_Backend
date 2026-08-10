@@ -5,6 +5,7 @@ import { swaggerSpec } from "./docs/swagger.js";
 import swaggerUi from "swagger-ui-express";
 
 import responseGenerator from "./middleware/responseGenerator.js";
+import { authLimiter, generalLimiter } from "./middleware/rateLimiter.js";
 
 import authRoutes from "./routes/authRoutes.js";
 import adminRoutes from "./routes/adminRoute.js";
@@ -48,6 +49,12 @@ app.use(
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(responseGenerator);
+
+// Skip rate limiting during tests (all supertest requests share one IP)
+if (process.env.NODE_ENV !== "test") {
+  app.use("/api/auth/", authLimiter);
+  app.use("/api/", generalLimiter);
+}
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
