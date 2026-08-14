@@ -55,7 +55,9 @@ const login = async (data) => {
         throw new Error("Your account has been rejected");
     }
 
-    const isMatch = await bcrypt.compare(data.password, user.password);
+    const isMatch = user.password
+        ? await bcrypt.compare(data.password, user.password)
+        : false;
     if (!isMatch) {
         throw new Error("Invalid credentials");
     }

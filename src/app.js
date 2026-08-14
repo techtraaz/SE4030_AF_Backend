@@ -8,6 +8,7 @@ import responseGenerator from "./middleware/responseGenerator.js";
 import { authLimiter, generalLimiter } from "./middleware/rateLimiter.js";
 
 import authRoutes from "./routes/authRoutes.js";
+import oauthRoutes from "./routes/oauthRoutes.js";
 import adminRoutes from "./routes/adminRoute.js";
 import quizRoutes from "./routes/quiz/quizIndex.js";
 import courseRoutes from "./routes/course/courseRoutes.js";
@@ -62,6 +63,7 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 app.use("/api/auth", authRoutes);
+app.use("/api/auth", oauthRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/quiz", quizRoutes);
