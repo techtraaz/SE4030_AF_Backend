@@ -34,4 +34,40 @@ const handleCallback = async (req, res) => {
     }
 };
 
-export { redirectToProvider, handleCallback };
+const redirectToGithub = async (req, res) => {
+    try {
+        const { url } = oauthService.buildGithubAuthorizeUrl("github");
+        return res.redirect(url);
+    } catch (error) {
+        return res.error("Failed to start GitHub login. Is Auth0 configured?");
+    }
+};
+
+const handleGithubCallback = async (req, res) => {
+    try {
+        const { code, state } = req.query;
+
+        if (!code || !oauthService.verifyGithubState(state)) {
+            return res.badRequest("Invalid GitHub OAuth state or missing authorization code");
+        }
+
+        // Exchange authorization code with Auth0 (not directly with GitHub)
+        const tokens = await oauthService.exchangeCodeForTokens(code);
+        if (!tokens.id_token) {
+            return res.unauthorized("No ID token returned by Auth0");
+        }
+
+        // Verify the ID token with Auth0 JWKS
+        const profile = await oauthService.verifyIdToken(tokens.id_token);
+        const { user, token } = await oauthService.findOrCreateGitHubUser(profile);
+
+        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+        return res.redirect(
+            `${frontendUrl}/auth/callback?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(user))}`
+        );
+    } catch (error) {
+        return res.unauthorized(error.message);
+    }
+};
+
+export { redirectToProvider, handleCallback, redirectToGithub, handleGithubCallback };
