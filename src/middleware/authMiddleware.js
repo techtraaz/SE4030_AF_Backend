@@ -3,6 +3,10 @@ import User from "../models/auth/user.js";
 import { ACCOUNT_STATUSES, ROLES } from "../utils/constants.js";
 import BlacklistedToken from "../models/auth/blacklistedToken.js";
 
+// Validates the INTERNAL app JWT issued by authService/oauthService
+// (jsonwebtoken + JWT_SECRET), not raw Auth0 tokens. Auth0 id_tokens are
+// verified via JWKS in src/service/oauthService.js then replaced by this JWT.
+
 const authenticate = async (req, res, next) => {
     const authHeader = req.headers.authorization;
 

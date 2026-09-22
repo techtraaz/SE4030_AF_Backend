@@ -8,3 +8,26 @@ CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
 
 ALLOWED_ORIGINS=
+
+# ─── Auth0 (backend Authorization Code flow for Google + GitHub) ───
+# Required for GET /api/auth/google, /api/auth/github and callbacks.
+AUTH0_DOMAIN=
+AUTH0_CLIENT_ID=
+AUTH0_CLIENT_SECRET=
+AUTH0_REDIRECT_URI=
+# Optional: Auth0 API identifier. When set, it is requested as `audience`
+# in the authorize URL. ID-token verification always uses audience=clientId.
+# If Auth0 returns "Client ... is not authorized to access resource server ...",
+# either authorize the Application for this API (Dashboard > Applications >
+# APIs > Authorize) or leave AUTH0_AUDIENCE empty for login-only (no API token).
+AUTH0_AUDIENCE=
+# Optional separate GitHub callback. Defaults to AUTH0_REDIRECT_URI.
+# If set, register BOTH URLs in Auth0 Allowed Callback URLs.
+AUTH0_GITHUB_REDIRECT_URI=
+
+# Where the backend redirects after OAuth: <FRONTEND_URL>/auth/callback?token=&user=
+FRONTEND_URL=
+
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=

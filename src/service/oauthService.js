@@ -7,11 +7,18 @@ import { ROLES, ACCOUNT_STATUSES } from "../utils/constants.js";
 // ─── Auth0 Configuration (Authorization Code flow) ─────────────────────────────
 // Read lazily so environment variables are picked up at request time (dotenv,
 // tests, etc. may set them after module load).
+// AUTH0_AUDIENCE is optional: set it when an Auth0 API identifier is used so
+// it is requested during authorize and can be enforced for access tokens.
+// ID-token verification below always uses audience=clientId (correct per OIDC).
+// AUTH0_GITHUB_REDIRECT_URI is optional: falls back to AUTH0_REDIRECT_URI.
+// Register BOTH callback URLs in Auth0 Allowed Callback URLs.
 const getAuth0Config = () => ({
     domain: process.env.AUTH0_DOMAIN,
     clientId: process.env.AUTH0_CLIENT_ID,
     clientSecret: process.env.AUTH0_CLIENT_SECRET,
     redirectUri: process.env.AUTH0_REDIRECT_URI,
+    githubRedirectUri: process.env.AUTH0_GITHUB_REDIRECT_URI || process.env.AUTH0_REDIRECT_URI,
+    audience: process.env.AUTH0_AUDIENCE || null,
     issuer: process.env.AUTH0_DOMAIN ? `https://${process.env.AUTH0_DOMAIN}/` : null,
     authorizeUrl: process.env.AUTH0_DOMAIN ? `https://${process.env.AUTH0_DOMAIN}/authorize` : null,
     tokenUrl: process.env.AUTH0_DOMAIN ? `https://${process.env.AUTH0_DOMAIN}/oauth/token` : null,
@@ -22,6 +29,16 @@ const getAuth0Config = () => ({
 const stateStore = new Map();
 const STATE_TTL_MS = 10 * 60 * 1000;
 
+// Prune expired states on each insert so the Map cannot grow unbounded.
+const pruneExpiredStates = () => {
+    const now = Date.now();
+    for (const [state, entry] of stateStore) {
+        if (now - entry.createdAt >= STATE_TTL_MS) {
+            stateStore.delete(state);
+        }
+    }
+};
+
 const buildAuthorizeUrl = () => {
     const config = getAuth0Config();
     if (!config.domain || !config.clientId || !config.redirectUri) {
@@ -29,6 +46,7 @@ const buildAuthorizeUrl = () => {
     }
 
     const state = crypto.randomBytes(16).toString("hex");
+    pruneExpiredStates();
     stateStore.set(state, { createdAt: Date.now() });
 
     const params = new URLSearchParams({
@@ -38,6 +56,9 @@ const buildAuthorizeUrl = () => {
         scope: "openid profile email",
         state,
     });
+    if (config.audience) {
+        params.set("audience", config.audience);
+    }
 
     return { url: `${config.authorizeUrl}?${params.toString()}`, state };
 };
@@ -50,14 +71,18 @@ const verifyState = (state) => {
     return Date.now() - entry.createdAt < STATE_TTL_MS;
 };
 
-const exchangeCodeForTokens = async (code) => {
+const exchangeCodeForTokens = async (code, redirectUriOverride = null) => {
     const config = getAuth0Config();
+    const redirectUri = redirectUriOverride || config.redirectUri;
+    if (!config.tokenUrl || !config.clientId || !redirectUri) {
+        throw new Error("Auth0 configuration is incomplete");
+    }
     const body = new URLSearchParams({
         grant_type: "authorization_code",
         client_id: config.clientId,
         client_secret: config.clientSecret,
         code,
-        redirect_uri: config.redirectUri,
+        redirect_uri: redirectUri,
     });
 
     const response = await fetch(config.tokenUrl, {
@@ -75,10 +100,15 @@ const exchangeCodeForTokens = async (code) => {
 
 const verifyIdToken = async (idToken) => {
     const config = getAuth0Config();
+    if (!config.jwksUrl || !config.issuer || !config.clientId) {
+        throw new Error("Auth0 configuration is incomplete");
+    }
     const JWKS = createRemoteJWKSet(new URL(config.jwksUrl));
+    // OIDC id_token audience is the Auth0 Application clientId (not the API audience).
     const { payload } = await jwtVerify(idToken, JWKS, {
         issuer: config.issuer,
         audience: config.clientId,
+        clockTolerance: 30,
     });
     return payload;
 };
@@ -135,21 +165,26 @@ const findOrCreateOAuthUser = async (profile) => {
 
 const buildGithubAuthorizeUrl = (connection = "github") => {
     const config = getAuth0Config();
-    if (!config.domain || !config.clientId || !config.redirectUri) {
+    const redirectUri = config.githubRedirectUri;
+    if (!config.domain || !config.clientId || !redirectUri) {
         throw new Error("Auth0 configuration is incomplete");
     }
 
     const state = crypto.randomBytes(16).toString("hex");
+    pruneExpiredStates();
     stateStore.set(state, { createdAt: Date.now() });
 
     const params = new URLSearchParams({
         response_type: "code",
         client_id: config.clientId,
-        redirect_uri: config.redirectUri,
+        redirect_uri: redirectUri,
         scope: "openid profile email",
         state,
         connection,
     });
+    if (config.audience) {
+        params.set("audience", config.audience);
+    }
 
     return { url: `${config.authorizeUrl}?${params.toString()}`, state };
 };
@@ -208,5 +243,9 @@ const findOrCreateGitHubUser = async (profile) => {
 };
 
 // Export all functions
-export { buildAuthorizeUrl, verifyState, exchangeCodeForTokens, verifyIdToken, findOrCreateOAuthUser };
+// Note: API routes validate the internal app JWT (jsonwebtoken + JWT_SECRET)
+// in src/middleware/authMiddleware.js. Auth0 tokens are exchanged + verified
+// here and then replaced by the internal JWT — `express-oauth2-jwt-bearer`
+// is intentionally not used.
+export { getAuth0Config, buildAuthorizeUrl, verifyState, exchangeCodeForTokens, verifyIdToken, findOrCreateOAuthUser };
 export { buildGithubAuthorizeUrl, verifyGithubState, findOrCreateGitHubUser };
