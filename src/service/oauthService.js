@@ -41,7 +41,7 @@ const pruneExpiredStates = () => {
     }
 };
 
-const buildAuthorizeUrl = () => {
+const buildAuthorizeUrl = (connection = process.env.AUTH0_GOOGLE_CONNECTION || "google-oauth2") => {
     const config = getAuth0Config();
     if (!config.domain || !config.clientId || !config.redirectUri) {
         throw new Error("Auth0 configuration is incomplete");
@@ -57,6 +57,10 @@ const buildAuthorizeUrl = () => {
         redirect_uri: config.redirectUri,
         scope: "openid profile email",
         state,
+        // Go straight to Google (skip Auth0 universal login) and force the
+        // Google account chooser every time instead of silent SSO.
+        connection,
+        prompt: "select_account",
     });
     if (config.audience) {
         params.set("audience", config.audience);
