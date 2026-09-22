@@ -99,4 +99,46 @@ const handleGithubCallback = async (req, res) => {
     }
 };
 
-export { redirectToProvider, handleCallback, redirectToGithub, handleGithubCallback };
+const redirectToFacebook = async (req, res) => {
+    try {
+        const { url } = oauthService.buildFacebookAuthorizeUrl("facebook");
+        return res.redirect(url);
+    } catch (error) {
+        return res.error("Failed to start Facebook login. Is Auth0 configured?");
+    }
+};
+
+const handleFacebookCallback = async (req, res) => {
+    try {
+        if (req.query.error) {
+            return redirectWithError(res, req.query.error, req.query.error_description);
+        }
+
+        const { code, state } = req.query;
+
+        if (!code || !oauthService.verifyFacebookState(state)) {
+            return res.badRequest("Invalid Facebook OAuth state or missing authorization code");
+        }
+
+        // Must use the same redirect_uri sent in the authorize step.
+        const config = oauthService.getAuth0Config();
+        const redirectUri = config.facebookRedirectUri || config.redirectUri;
+
+        const tokens = await oauthService.exchangeCodeForTokens(code, redirectUri);
+        if (!tokens.id_token) {
+            return res.unauthorized("No ID token returned by Auth0");
+        }
+
+        const profile = await oauthService.verifyIdToken(tokens.id_token);
+        const { user, token } = await oauthService.findOrCreateFacebookUser(profile);
+
+        const frontendUrl = getFrontendUrl();
+        return res.redirect(
+            `${frontendUrl}/auth/callback?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(user))}`
+        );
+    } catch (error) {
+        return res.unauthorized(error.message);
+    }
+};
+
+export { redirectToProvider, handleCallback, redirectToGithub, handleGithubCallback, redirectToFacebook, handleFacebookCallback };

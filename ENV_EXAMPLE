@@ -21,9 +21,10 @@ AUTH0_REDIRECT_URI=
 # either authorize the Application for this API (Dashboard > Applications >
 # APIs > Authorize) or leave AUTH0_AUDIENCE empty for login-only (no API token).
 AUTH0_AUDIENCE=
-# Optional separate GitHub callback. Defaults to AUTH0_REDIRECT_URI.
-# If set, register BOTH URLs in Auth0 Allowed Callback URLs.
+# Optional separate GitHub/Facebook callbacks. Default to AUTH0_REDIRECT_URI.
+# If set, register ALL URLs in Auth0 Allowed Callback URLs.
 AUTH0_GITHUB_REDIRECT_URI=
+AUTH0_FACEBOOK_REDIRECT_URI=
 
 # Where the backend redirects after OAuth: <FRONTEND_URL>/auth/callback?token=&user=
 FRONTEND_URL=

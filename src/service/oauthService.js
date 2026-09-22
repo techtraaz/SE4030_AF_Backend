@@ -10,14 +10,16 @@ import { ROLES, ACCOUNT_STATUSES } from "../utils/constants.js";
 // AUTH0_AUDIENCE is optional: set it when an Auth0 API identifier is used so
 // it is requested during authorize and can be enforced for access tokens.
 // ID-token verification below always uses audience=clientId (correct per OIDC).
-// AUTH0_GITHUB_REDIRECT_URI is optional: falls back to AUTH0_REDIRECT_URI.
-// Register BOTH callback URLs in Auth0 Allowed Callback URLs.
+// AUTH0_GITHUB_REDIRECT_URI / AUTH0_FACEBOOK_REDIRECT_URI are optional:
+// fall back to AUTH0_REDIRECT_URI. Register ALL callback URLs in Auth0
+// Allowed Callback URLs.
 const getAuth0Config = () => ({
     domain: process.env.AUTH0_DOMAIN,
     clientId: process.env.AUTH0_CLIENT_ID,
     clientSecret: process.env.AUTH0_CLIENT_SECRET,
     redirectUri: process.env.AUTH0_REDIRECT_URI,
     githubRedirectUri: process.env.AUTH0_GITHUB_REDIRECT_URI || process.env.AUTH0_REDIRECT_URI,
+    facebookRedirectUri: process.env.AUTH0_FACEBOOK_REDIRECT_URI || process.env.AUTH0_REDIRECT_URI,
     audience: process.env.AUTH0_AUDIENCE || null,
     issuer: process.env.AUTH0_DOMAIN ? `https://${process.env.AUTH0_DOMAIN}/` : null,
     authorizeUrl: process.env.AUTH0_DOMAIN ? `https://${process.env.AUTH0_DOMAIN}/authorize` : null,
@@ -163,9 +165,9 @@ const findOrCreateOAuthUser = async (profile) => {
 // /authorize endpoint with a "connection=github" parameter. Auth0 then handles
 // the GitHub OAuth flow and callback, returning the user profile and tokens.
 
-const buildGithubAuthorizeUrl = (connection = "github") => {
+// Generic social-connection authorize URL builder (github, facebook, ...).
+const buildConnectionAuthorizeUrl = (connection, redirectUri) => {
     const config = getAuth0Config();
-    const redirectUri = config.githubRedirectUri;
     if (!config.domain || !config.clientId || !redirectUri) {
         throw new Error("Auth0 configuration is incomplete");
     }
@@ -187,6 +189,11 @@ const buildGithubAuthorizeUrl = (connection = "github") => {
     }
 
     return { url: `${config.authorizeUrl}?${params.toString()}`, state };
+};
+
+const buildGithubAuthorizeUrl = (connection = "github") => {
+    const config = getAuth0Config();
+    return buildConnectionAuthorizeUrl(connection, config.githubRedirectUri);
 };
 
 const verifyGithubState = (state) => {
@@ -242,6 +249,78 @@ const findOrCreateGitHubUser = async (profile) => {
     return { user: userObj, token };
 };
 
+// ─── Auth0-Mediated Facebook Connection ───────────────────────────────────────
+// Same pattern as GitHub: backend redirects to Auth0 /authorize with
+// connection=facebook. Facebook email permission is required — if Auth0 does
+// not return an email, account creation is rejected with a clear message.
+
+const buildFacebookAuthorizeUrl = (connection = "facebook") => {
+    const config = getAuth0Config();
+    return buildConnectionAuthorizeUrl(connection, config.facebookRedirectUri);
+};
+
+const verifyFacebookState = (state) => {
+    if (!state) return false;
+    const entry = stateStore.get(state);
+    if (!entry) return false;
+    stateStore.delete(state);
+    return Date.now() - entry.createdAt < STATE_TTL_MS;
+};
+
+const findOrCreateFacebookUser = async (profile) => {
+    if (profile.email_verified === false) {
+        throw new Error("Facebook account email is not verified");
+    }
+    if (!profile.email) {
+        throw new Error("Facebook account did not return an email address. Please allow email access and try again");
+    }
+
+    let user = await User.findOne({ $or: [{ googleId: profile.sub }, { email: profile.email }] });
+
+    if (user) {
+        if (!user.googleId) {
+            user.googleId = profile.sub; // reuse googleId field for Facebook ID
+            user.authProvider = "facebook";
+            user.displayName = user.displayName || profile.name;
+            user.avatar = user.avatar || profile.picture;
+            await user.save();
+        } else if (user.authProvider !== "facebook" && user.email === profile.email) {
+            // Link same-email local/Google/GitHub account to Facebook on first login.
+            // Keep original googleId (external sub) to avoid unique-index clash.
+            user.displayName = user.displayName || profile.name;
+            user.avatar = user.avatar || profile.picture;
+            await user.save();
+        }
+    } else {
+        user = await User.create({
+            email: profile.email,
+            googleId: profile.sub, // reuse googleId field for Facebook ID
+            authProvider: "facebook",
+            displayName: profile.name,
+            avatar: profile.picture,
+            role: ROLES.REFUGEE,
+            status: ACCOUNT_STATUSES.ACTIVE,
+        });
+    }
+
+    if (user.status === ACCOUNT_STATUSES.PENDING) {
+        throw new Error("Your account is pending admin approval");
+    }
+    if (user.status === ACCOUNT_STATUSES.REJECTED) {
+        throw new Error("Your account has been rejected");
+    }
+
+    const token = jwt.sign(
+        { id: user._id, role: user.role },
+        process.env.JWT_SECRET,
+        { expiresIn: "1h" }
+    );
+
+    const userObj = user.toObject();
+    delete userObj.password;
+    return { user: userObj, token };
+};
+
 // Export all functions
 // Note: API routes validate the internal app JWT (jsonwebtoken + JWT_SECRET)
 // in src/middleware/authMiddleware.js. Auth0 tokens are exchanged + verified
@@ -249,3 +328,4 @@ const findOrCreateGitHubUser = async (profile) => {
 // is intentionally not used.
 export { getAuth0Config, buildAuthorizeUrl, verifyState, exchangeCodeForTokens, verifyIdToken, findOrCreateOAuthUser };
 export { buildGithubAuthorizeUrl, verifyGithubState, findOrCreateGitHubUser };
+export { buildFacebookAuthorizeUrl, verifyFacebookState, findOrCreateFacebookUser };
