@@ -73,12 +73,23 @@ In the Railway dashboard:
 | `CLOUDINARY_API_SECRET` | Cloudinary API SECRET         |
 | `CLOUDINARY_CLOUD_NAME` | Cloudinary Cloud Name         |
 | `TRANSLATE_KEY`         | Google Translate API Key      |
+| `AUTH0_DOMAIN`          | Auth0 tenant domain (e.g. `tenant.us.auth0.com`) |
+| `AUTH0_CLIENT_ID`       | Auth0 Application Client ID   |
+| `AUTH0_CLIENT_SECRET`   | Auth0 Application Client Secret |
+| `AUTH0_REDIRECT_URI`    | Auth0 callback URL (e.g. `https://api.../api/auth/google/callback`) |
+| `AUTH0_AUDIENCE`        | (Optional) Auth0 API identifier requested as `audience` |
+| `FRONTEND_URL`          | Frontend URL for OAuth redirect (e.g. `https://app...`) |
 
 
 **Example:**
 ```
 MONGO_URI=mongodb+srv://user:password@cluster.mongodb.net/dbname
 JWT_SECRET=your_super_secret_key_here
+AUTH0_DOMAIN=tenant.us.auth0.com
+AUTH0_CLIENT_ID=your_auth0_client_id
+AUTH0_CLIENT_SECRET=your_auth0_client_secret
+AUTH0_REDIRECT_URI=https://afbackend-production-af0b.up.railway.app/api/auth/google/callback
+FRONTEND_URL=https://frontend...vercel.app
 
 ```
 

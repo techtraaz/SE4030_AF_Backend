@@ -10,7 +10,7 @@ const userSchema = new mongoose.Schema(
         },
         password: {
             type: String,
-            required: true
+            required: false
         },
         role: {
             type: String,
@@ -21,6 +21,22 @@ const userSchema = new mongoose.Schema(
             type: String,
             enum: Object.values(ACCOUNT_STATUSES),
             default: ACCOUNT_STATUSES.ACTIVE
+        },
+        displayName: {
+            type: String
+        },
+        avatar: {
+            type: String
+        },
+        googleId: {
+            type: String,
+            unique: true,
+            sparse: true
+        },
+        authProvider: {
+            type: String,
+            enum: ["local", "google", "github", "facebook"],
+            default: "local"
         },
     },
     { 
