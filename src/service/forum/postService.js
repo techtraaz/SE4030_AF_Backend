@@ -2,6 +2,7 @@ import Post from "../../models/forum/post.js";
 import ForumMembership from "../../models/forum/forumMembership.js";
 import ForumBan from "../../models/forum/forumBan.js";
 import Forum from "../../models/forum/forum.js";
+import { ROLES } from "../../utils/constants.js";
 
 // Helper: Verify user is a member and not banned
 const verifyForumAccess = async (userId, forumId) => {
@@ -74,7 +75,7 @@ const deletePost = async (userId, role, postId) => {
     if (!post) throw new Error("Post not found");
 
     const isOwner = post.authorId.toString() === userId.toString();
-    const isAdmin = role === "admin";
+    const isAdmin = role === ROLES.ADMIN;
 
     if (!isOwner && !isAdmin) {
         throw new Error("Unauthorized to delete this post");
